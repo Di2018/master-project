@@ -1,0 +1,140 @@
+<?php
+class application {
+	
+	public $database;
+	public $url;
+	public $navigation_history;
+	
+	public function run() {
+		$this->top();
+		$this->setDefaultTimezone();
+		$this->cookieLogin();
+		$this->setTimezone();
+		$this->setView();
+		$this->setController();
+		$template = new template($this->controller, $this->view, $this->url, $this->navigation_history);
+		$this->bottom();
+	}
+	
+	protected function top() {
+		global $database;
+		session_start();
+		require DIR_APPLICATION . 'controller.php';
+		require DIR_FUNCTIONS . 'general.php';
+		$this->includes();
+		$database = $this->database = new database();
+		$dbLink = $this->database->connect();
+		$this->navigation_history = new navigation_history();
+		$this->navigation_history->add_page();
+		$this->url = new url();
+		$this->url->parse();
+	}
+	
+	protected function bottom() {
+		$this->database->close();
+		session_write_close();
+	}
+	
+	protected function setController() {
+		$this->controller = $this->url->controller;
+		require DIR_CONTROLLERS . $this->controller . 'Controller.php';
+	}
+	
+	protected function setView() {
+		$this->view = $this->url->action;
+	}
+	
+	protected function cookieLogin() {
+		if (!isset($_SESSION['member_id']) && isset($_COOKIE['member'])) {
+			$cookie = explode('#', $_COOKIE['member']);
+			$member = new member();
+			if ($member = $member->cookieCheck($cookie[0], $cookie[1])) {
+				
+			}
+		}
+		if (!isset($_SESSION['supplier_id']) && isset($_COOKIE['supplier'])) {
+			$cookie = explode('#', $_COOKIE['supplier']);
+			$supplier = new supplier();
+			if ($supplier = $supplier->cookieCheck($cookie[0], $cookie[1])) {
+				
+			}
+		}
+		if (!isset($_SESSION['admin_id']) && isset($_COOKIE['admin'])) {
+			$cookie = explode('#', $_COOKIE['admin']);
+			$admin = new admin();
+			if ($admin = $admin->cookieCheck($cookie[0], $cookie[1])) {
+				
+			}
+		}
+	}
+	
+	protected function includes() {
+		//$this->includeDir(DIR_CLASSES);
+		//$this->includeDir(DIR_MODELS);
+	}
+	
+	protected function includeDir($dir) {
+		$d = dir($dir);
+		while (false !== ($entry = $d->read())) {
+			 if (substr($entry, -4) == '.php') {
+				 $files[] = $entry;
+			 }
+		}
+		reset($files);
+		sort($files);
+		foreach ($files as $file) {
+			require_once $dir . $file;
+		}
+		$d->close();
+	}
+	
+	public static function includeClass($class) {
+		
+		if (strstr($class, '\\')) {
+			$class = str_replace('\\', DIRECTORY_SEPARATOR, $class);
+		}			
+			
+		if (is_file(DIR_CLASSES . $class . '.php')) {
+			require_once DIR_CLASSES . $class . '.php';
+		} elseif (is_file(DIR_MODELS . $class . '.php')) {
+			require_once DIR_MODELS . $class . '.php';
+		}
+	}
+	
+	protected function setTimezone() {
+		$timezone_code = DEFAULT_TIMEZONE;
+		$timezone = timezone::timezone_get_by_code($timezone_code);
+		$_SESSION['timezone_id'] = $timezone->get_id();
+		
+		if (isset($_SESSION['member_id'])) {
+			$member = new member();
+			$member->fetchRow($_SESSION['member_id']);
+			if ($member->get_timezone_id() > 0) {
+				$timezone = new timezone();
+				if ($timezone->fetchRow($member->get_timezone_id())) {
+					$timezone_code = $timezone->get_code();
+					$_SESSION['timezone_id'] = $timezone->get_id();
+				}
+			}
+		} elseif (isset($_SESSION['supplier_id'])) {
+			$supplier = new supplier();
+			$supplier->fetchRow($_SESSION['supplier_id']);
+			if ($supplier->get_timezone_id() > 0) {
+				$timezone = new timezone();
+				if ($timezone->fetchRow($supplier->get_timezone_id())) {
+					$timezone_code = $timezone->get_code();
+					$_SESSION['timezone_id'] = $timezone->get_id();
+				}
+			}
+		}
+		
+		date_default_timezone_set($timezone_code);
+	}
+	
+	protected function setDefaultTimezone() {
+		$timzone = 'Australia/Melbourne';
+		date_default_timezone_set($timzone);
+	}
+	
+}
+?>
